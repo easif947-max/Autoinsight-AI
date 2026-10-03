@@ -1,8 +1,20 @@
-from crewai import Task, Crew, Process
-from agents import create_manager_agent, create_analyst_agent, create_reporter_agent
-from tools import profile_csv_dataset, generate_plotly_chart_config, create_pdf_report
-from typing import Dict, Any
+import sys
+import os
+
+# Fix import paths for Streamlit Cloud execution
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
 import json
+from typing import Dict, Any
+from crewai import Task, Crew, Process
+
+from agents.manager_agent import create_manager_agent
+from agents.analyst_agent import create_analyst_agent
+from agents.reporter_agent import create_reporter_agent
+
+from tools.data_profiler_tool import profile_csv_dataset
+from tools.chart_generator_tool import generate_plotly_chart_config
+from tools.pdf_generator_tool import create_pdf_report
 
 class AutoInsightCrew:
     """Coordinates multi-agent execution pipeline for CSV dataset analytics."""
@@ -17,12 +29,8 @@ class AutoInsightCrew:
         self.reporter = create_reporter_agent()
 
     def run(self) -> Dict[str, Any]:
-        """
-        Executes the CrewAI sequential workflow.
+        """Executes the CrewAI sequential workflow."""
         
-        Returns:
-            Dict[str, Any]: Analysis result containing raw summary, executive text, and PDF output confirmation.
-        """
         # Task 1: Dataset Profiling & Statistical Execution
         profiling_task = Task(
             description=f"""
