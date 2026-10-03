@@ -1,14 +1,18 @@
+import sys
+import os
+
+# Fix import paths for Streamlit Cloud execution
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
 import streamlit as st
 import pandas as pd
 import json
-import os
 import time
 import plotly.io as pio
-from typing import Dict, Any
 
 from database import init_db, register_user, authenticate_user, save_analysis_history, get_user_history
 from crew import AutoInsightCrew
-from tools import profile_csv_dataset, generate_plotly_chart_config
+from tools.chart_generator_tool import generate_plotly_chart_config
 
 # Page Configuration
 st.set_page_config(
@@ -58,19 +62,6 @@ st.markdown("""
         border-radius: 4px;
         margin-bottom: 1rem;
     }
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 8px;
-    }
-    .stTabs [data-baseweb="tab"] {
-        background-color: #1E293B;
-        border-radius: 6px 6px 0 0;
-        padding: 10px 20px;
-        color: #94A3B8;
-    }
-    .stTabs [aria-selected="true"] {
-        background-color: #2563EB !important;
-        color: #FFFFFF !important;
-    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -116,38 +107,10 @@ if not st.session_state.authenticated:
                 
     st.markdown('<div class="main-header">Welcome to AutoInsight AI</div>', unsafe_allow_html=True)
     st.markdown('<div class="sub-header">Autonomous Multi-Agent Data Analytics Platform</div>', unsafe_allow_html=True)
-    
     st.info("👈 Please **Sign In** or **Register** using the sidebar to begin analyzing your datasets.")
-    
-    st.markdown("### Platform Features")
-    col_f1, col_f2, col_f3 = st.columns(3)
-    with col_f1:
-        st.markdown("""
-        <div class="metric-card">
-            <div class="metric-value">01</div>
-            <div class="metric-label">Deterministic Profiling</div>
-            <p style="font-size:0.85rem; color:#94A3B8; margin-top:0.5rem;">Pure Python computation for zero mathematical hallucination.</p>
-        </div>
-        """, unsafe_allow_html=True)
-    with col_f2:
-        st.markdown("""
-        <div class="metric-card">
-            <div class="metric-value">02</div>
-            <div class="metric-label">Multi-Agent AI</div>
-            <p style="font-size:0.85rem; color:#94A3B8; margin-top:0.5rem;">Orchestrated CrewAI squad driven by Groq LLM inference.</p>
-        </div>
-        """, unsafe_allow_html=True)
-    with col_f3:
-        st.markdown("""
-        <div class="metric-card">
-            <div class="metric-value">03</div>
-            <div class="metric-label">Executive Reports</div>
-            <p style="font-size:0.85rem; color:#94A3B8; margin-top:0.5rem;">Downloadable publication-ready PDF summaries and Plotly charts.</p>
-        </div>
-        """, unsafe_allow_html=True)
 
 else:
-    # Logged-in Header & Navigation
+    # Logged-in Navigation
     st.sidebar.markdown(f"**Logged in as:** `{st.session_state.user_email}`")
     if st.sidebar.button("Sign Out", use_container_width=True):
         st.session_state.authenticated = False
@@ -156,51 +119,48 @@ else:
         st.rerun()
         
     st.markdown('<div class="main-header">AutoInsight AI Analytics Hub</div>', unsafe_allow_html=True)
-    st.markdown('<div class="sub-header">Transform raw datasets into actionable executive intelligence in seconds.</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sub-header">Transform raw datasets into actionable executive intelligence.</div>', unsafe_allow_html=True)
 
     tab_analytics, tab_history = st.tabs(["🚀 New Analysis", "📜 My Saved Analyses"])
 
-    # TAB 1: CSV Upload & Multi-Agent Execution
+    # TAB 1: CSV Upload & Pipeline Engine
     with tab_analytics:
         st.subheader("1. Upload CSV Dataset")
         uploaded_file = st.file_uploader("Choose a CSV file (Max 100MB)", type=["csv"])
 
         if uploaded_file is not None:
-            # Save uploaded CSV locally to temp path
             os.makedirs("data_temp", exist_ok=True)
             temp_path = os.path.join("data_temp", uploaded_file.name)
             with open(temp_path, "wb") as f:
                 f.write(uploaded_file.getbuffer())
 
-            # Dataset Quick Preview
             df_preview = pd.read_csv(temp_path)
             st.markdown(f"**Loaded File:** `{uploaded_file.name}` | **Rows:** {df_preview.shape[0]:,} | **Columns:** {df_preview.shape[1]}")
             
-            with st.expander("🔍 Preview Raw Dataset (First 5 Rows)", expanded=False):
+            with st.expander("🔍 Preview Raw Dataset", expanded=False):
                 st.dataframe(df_preview.head(5), use_container_width=True)
 
             st.subheader("2. Analytical Focus & Execution")
             user_query = st.text_input(
-                "Optional Custom Intent / Business Question",
-                placeholder="e.g., Identify top customer churn drivers and outline key growth recommendations."
+                "Optional Business Question",
+                placeholder="e.g., Identify main revenue drivers and outlier trends."
             )
 
             if st.button("▶ Run Multi-Agent Analysis Pipeline", type="primary", use_container_width=True):
-                # Check for GROQ API Key
+                # Check for GROQ_API_KEY in Streamlit Secrets
                 if not os.environ.get("GROQ_API_KEY") and "GROQ_API_KEY" in st.secrets:
                     os.environ["GROQ_API_KEY"] = st.secrets["GROQ_API_KEY"]
 
                 if not os.environ.get("GROQ_API_KEY"):
-                    st.error("⚠️ GROQ_API_KEY is missing! Set it in your environment or Streamlit Secrets.")
+                    st.error("⚠️ GROQ_API_KEY is missing! Please set it in Streamlit Secrets.")
                 else:
                     status_box = st.empty()
                     
-                    # Agent Execution Simulation & Tracking
                     with status_box.container():
                         st.markdown("""
                         <div class="status-tracker">
-                            <b>🔄 Multi-Agent Pipeline Active...</b><br/>
-                            🔹 <i>Manager Agent</i>: Initializing schema parsing and intent strategy...
+                            <b>🔄 Multi-Agent Pipeline Running...</b><br/>
+                            🔹 <i>Manager Agent</i>: Orchestrating workflow...
                         </div>
                         """, unsafe_allow_html=True)
                     time.sleep(1)
@@ -208,28 +168,28 @@ else:
                     with status_box.container():
                         st.markdown("""
                         <div class="status-tracker">
-                            <b>🔄 Multi-Agent Pipeline Active...</b><br/>
-                            🔹 <i>Data Analyst Agent</i>: Computing missingness, descriptive stats, and Plotly configs...
+                            <b>🔄 Multi-Agent Pipeline Running...</b><br/>
+                            🔹 <i>Data Analyst Agent</i>: Calculating statistical metrics...
                         </div>
                         """, unsafe_allow_html=True)
 
-                    # Instantiate and run Crew
+                    # Execute Crew Workflow
                     crew_runner = AutoInsightCrew(file_path=temp_path, user_query=user_query)
                     results = crew_runner.run()
 
                     with status_box.container():
                         st.markdown("""
                         <div class="status-tracker">
-                            <b>🔄 Multi-Agent Pipeline Active...</b><br/>
-                            🔹 <i>Insights & Reporting Agent</i>: Synthesizing executive summaries and creating PDF brief...
+                            <b>🔄 Multi-Agent Pipeline Running...</b><br/>
+                            🔹 <i>Insights Agent</i>: Generating final executive brief...
                         </div>
                         """, unsafe_allow_html=True)
                     time.sleep(1)
 
                     status_box.success("✅ Multi-Agent Analysis Complete!")
 
-                    # Persist results in SQLite
-                    history_id = save_analysis_history(
+                    # Save result to SQLite
+                    save_analysis_history(
                         user_email=st.session_state.user_email,
                         file_name=uploaded_file.name,
                         data_summary=results["data_summary"],
@@ -239,7 +199,7 @@ else:
                     st.session_state.current_analysis = results
                     st.rerun()
 
-        # Render Active Analysis Output Dashboard
+        # Render Active Analysis Results
         if st.session_state.current_analysis:
             st.markdown("---")
             st.subheader("3. Executive Dashboard & Findings")
@@ -248,7 +208,6 @@ else:
             summary = analysis_data.get("data_summary", {})
             report_text = analysis_data.get("executive_report", "")
 
-            # Overview Metrics
             if "overview" in summary:
                 ov = summary["overview"]
                 c1, c2, c3, c4 = st.columns(4)
@@ -259,30 +218,6 @@ else:
 
             st.markdown("### Executive Summary Brief")
             st.markdown(report_text)
-
-            # Interactive Plotly Chart Display
-            st.markdown("### Data Visualizations")
-            if "numeric_summary" in summary and summary["numeric_summary"]:
-                numeric_cols = list(summary["numeric_summary"].keys())
-                if len(numeric_cols) >= 1:
-                    col_x = numeric_cols[0]
-                    col_y = numeric_cols[1] if len(numeric_cols) > 1 else numeric_cols[0]
-                    
-                    chart_json_str = generate_plotly_chart_config.run(
-                        file_path=temp_path,
-                        chart_type="scatter" if len(numeric_cols) > 1 else "histogram",
-                        x_axis=col_x,
-                        y_axis=col_y if len(numeric_cols) > 1 else "",
-                        title=f"{col_x} vs {col_y}" if len(numeric_cols) > 1 else f"Distribution of {col_x}"
-                    )
-                    
-                    try:
-                        chart_data = json.loads(chart_json_str)
-                        if "plotly_json" in chart_data:
-                            fig = pio.from_json(json.dumps(chart_data["plotly_json"]))
-                            st.plotly_chart(fig, use_container_width=True)
-                    except Exception as e:
-                        st.info("Generating standard distribution chart...")
 
             # PDF Download Handler
             st.markdown("### Download Deliverables")
@@ -310,6 +245,5 @@ else:
                     st.markdown("**Overview Summary:**")
                     ov = record["data_summary"].get("overview", {})
                     st.write(f"- Rows: {ov.get('total_rows', 'N/A')} | Columns: {ov.get('total_columns', 'N/A')}")
-                    
                     st.markdown("**Executive Report:**")
                     st.markdown(record["executive_report"])
